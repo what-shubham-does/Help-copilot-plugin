@@ -1,1 +1,818 @@
+/* ── Toggle pill ─────────────────────────────── */
+.hc-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  background: #EEF4FF;
+  border: 1px solid #C2D9F8;
+  border-radius: 100px;
+  padding: 3px;
+  gap: 2px;
+  cursor: pointer;
+  vertical-align: middle;
+}
 
+.hc-toggle-opt {
+  font-size: 12px;
+  font-weight: 400;
+  color: #5A7FAD;
+  padding: 6px 16px;
+  border-radius: 100px;
+  white-space: nowrap;
+  transition: all 0.25s ease;
+  user-select: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.hc-toggle-opt.active {
+  background: #0057B8;
+  color: #FFFFFF;
+  font-weight: 600;
+  border-color: #004EA3;
+  box-shadow: 0 1px 4px rgba(0, 87, 184, 0.25);
+}
+
+.hc-toggle-opt:not(.active):hover {
+  color: #003D8A;
+}
+
+
+/* ── Mobile FAB ──────────────────────────────── */
+.hc-mobile-fab {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #0057B8;
+  color: #FFFFFF;
+  border: none;
+  box-shadow:
+    0 2px 8px rgba(0, 30, 70, 0.2),
+    0 6px 20px rgba(0, 30, 70, 0.18);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  z-index: 99997;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.hc-mobile-fab:hover {
+  background: #004EA3;
+  transform: scale(1.06);
+}
+
+.hc-mobile-fab:active {
+  transform: scale(0.97);
+}
+
+.hc-mobile-fab img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  display: block;
+}
+
+
+/* ── Backdrop ────────────────────────────────── */
+/* Subtle on desktop (panel mode), stronger on mobile (full-screen mode) */
+.hc-ask-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 99998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.hc-ask-backdrop.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+
+/* ── Ask overlay — bottom-right panel ────────── */
+.hc-ask-overlay {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  /* width overridden by inline style from plugin settings (default 400px) */
+  width: 400px;
+  height: 580px;
+  min-width: 300px;
+  min-height: 380px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  z-index: 99999;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  box-shadow:
+    0 2px 8px rgba(0, 30, 70, 0.08),
+    0 16px 48px rgba(0, 30, 70, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(16px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  overflow: hidden;
+}
+
+.hc-ask-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+
+/* ── Resize handle ───────────────────────────── */
+/*
+ * Positioned at the top-left corner of the overlay panel.
+ * Dragging expands the panel toward the top and left,
+ * which is natural for a bottom-right anchored widget.
+ */
+.hc-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 54px; /* matches header height */
+  cursor: nw-resize;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px 0 0 0;
+}
+
+/* Three-dot grip indicator */
+.hc-resize-handle::before {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  box-shadow: 5px 0 0 rgba(255, 255, 255, 0.3), 10px 0 0 rgba(255, 255, 255, 0.3);
+}
+
+.hc-resize-handle:hover::before {
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 5px 0 0 rgba(255, 255, 255, 0.6), 10px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+
+/* ── Overlay header ──────────────────────────── */
+.hc-ask-header {
+  height: 54px;
+  background: #0057B8;
+  border-bottom: 1px solid #004EA3;
+  display: flex;
+  align-items: center;
+  padding: 0 16px 0 32px; /* left padding clears the resize handle */
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.hc-ask-logo {
+  font-size: 13px;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hc-ask-logo-mark {
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hc-ask-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hc-btn-new-chat {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  font-weight: 500;
+  color: #FFFFFF;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.hc-btn-new-chat:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.hc-btn-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.hc-btn-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+}
+
+.hc-ask-header .hc-toggle-pill {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.hc-ask-header .hc-toggle-opt {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.hc-ask-header .hc-toggle-opt.active {
+  background: #FFFFFF;
+  color: #0057B8;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.hc-ask-header .hc-toggle-opt:not(.active):hover {
+  color: #FFFFFF;
+}
+
+
+/* ── Context badge ───────────────────────────── */
+
+
+
+
+/* ── Body ────────────────────────────────────── */
+.hc-ask-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+
+
+/* ── Legacy iframe (used when no Direct Line secret) ── */
+.hc-ask-body iframe {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: none;
+}
+
+
+/* ── Webchat container ───────────────────────── */
+.hc-webchat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  display: none; /* shown via JS when webchat initialises */
+}
+
+/* Webchat root fills the container */
+.hc-webchat-container > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Webchat style overrides ─────────────────── */
+/* Suppress Microsoft default styling that conflicts with our shell */
+
+/* Transcript area */
+.hc-webchat-container [data-id="webchat-fluent-theme"] {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Remove default outer border/background */
+.hc-webchat-container .webchat__css-custom-properties {
+  background: transparent;
+}
+
+/* Reference links — styled list, matching site link colour */
+.hc-webchat-container a {
+  color: #0057B8;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 87, 184, 0.35);
+  text-underline-offset: 2px;
+}
+
+.hc-webchat-container a:hover {
+  text-decoration-color: #0057B8;
+}
+
+/* Related links rendered as a tidy list */
+.hc-webchat-container ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.hc-webchat-container ul li {
+  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Send box */
+.hc-webchat-container .webchat__send-box {
+  border-top: 1px solid #D0E2F8;
+  background: #F5F8FF;
+}
+
+/* Timestamps */
+.hc-webchat-container .webchat__stacked-layout__status {
+  font-size: 11px;
+  color: #7A9CBF;
+}
+
+
+/* ── Loading spinner ─────────────────────────── */
+.hc-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+  z-index: 1;
+  transition: opacity 0.3s ease;
+}
+
+.hc-loading.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hc-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #EEF4FF;
+  border-top-color: #0057B8;
+  border-radius: 50%;
+  animation: hcSpin 0.8s linear infinite;
+}
+
+@keyframes hcSpin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* ── Error state ─────────────────────────────── */
+.hc-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #FFFFFF;
+  z-index: 1;
+  padding: 40px 24px;
+}
+
+.hc-error.hidden {
+  display: none;
+}
+
+.hc-error-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #EEF4FF;
+  border: 1px solid #C2D9F8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hc-error-msg {
+  font-size: 14px;
+  color: #444;
+  margin: 0;
+  text-align: center;
+}
+
+.hc-btn-retry {
+  height: 34px;
+  padding: 0 18px;
+  border: 1px solid #C2D9F8;
+  border-radius: 8px;
+  background: #F0F6FF;
+  color: #0057B8;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.hc-btn-retry:hover {
+  background: #E0EDFF;
+  border-color: #99C4FF;
+}
+
+
+/* ── Powered-by bar ──────────────────────────── */
+.hc-powered-bar {
+  height: 30px;
+  background: #F5F8FF;
+  border-top: 1px solid #D0E2F8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #7A9CBF;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+
+/* ── Responsive ──────────────────────────────── */
+@media (max-width: 640px) {
+  /* Full-screen on mobile */
+  .hc-ask-overlay {
+    width: 100% !important;
+    height: 100% !important;
+    bottom: 0;
+    right: 0;
+    border-radius: 0;
+    transform: translateY(20px);
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .hc-ask-overlay.visible {
+    transform: translateY(0);
+  }
+
+  .hc-ask-header {
+    padding: 0 14px;
+  }
+
+  /* Backdrop dims on mobile full-screen */
+  .hc-ask-backdrop.visible {
+    background: rgba(0, 30, 70, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  /* Show mobile FAB */
+  .hc-mobile-fab {
+    display: flex;
+  }
+
+  /* FAB hides while overlay is open */
+  body.hc-overlay-open .hc-mobile-fab {
+    display: none;
+  }
+
+  /* Hide resize handle on mobile */
+  .hc-resize-handle {
+    display: none;
+  }
+
+  /* Hide context badge — no header space */
+}
+
+
+/* ── Landing page ────────────────────────────── */
+.hc-landing {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px 12px;
+  gap: 18px;
+  min-height: 0;
+}
+
+.hc-land-welcome {
+  text-align: center;
+  padding: 4px 0 2px;
+}
+
+.hc-land-avatar {
+  width: 46px;
+  height: 46px;
+  background: #EEF4FF;
+  border: 1.5px solid #C2D9F8;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 11px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0057B8;
+}
+
+.hc-land-welcome h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1A1A2E;
+  margin: 0 0 5px;
+  font-family: inherit;
+}
+
+.hc-land-welcome p {
+  font-size: 12px;
+  color: #7A9CBF;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.hc-land-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hc-land-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #7A9CBF;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.hc-page-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #EEF4FF;
+  border: 1px solid #C2D9F8;
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: #0057B8;
+  max-width: 100%;
+}
+
+.hc-page-tag svg {
+  flex-shrink: 0;
+  color: #0057B8;
+}
+
+.hc-page-tag span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hc-land-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.hc-land-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 0.5px solid #E5E3DB;
+  border-radius: 10px;
+  background: #FAFAFA;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1A1A2E;
+  line-height: 1.4;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.hc-land-chip:hover {
+  background: #EEF4FF;
+  border-color: #0057B8;
+}
+
+.hc-land-chip svg {
+  flex-shrink: 0;
+  color: #0057B8;
+}
+
+.hc-land-chip span {
+  flex: 1;
+}
+
+.hc-land-chip--accent {
+  background: #F0F6FF;
+  border-color: #C2D9F8;
+}
+
+.hc-land-chip--accent:hover {
+  background: #E0EDFF;
+  border-color: #0057B8;
+}
+
+@media (max-width: 640px) {
+  .hc-landing { padding: 16px 14px 10px; }
+}
+
+/* ══════════════════════════════════════════════
+   v1.3.6 additions
+══════════════════════════════════════════════ */
+
+/* ── Typography — Source Sans 3 ─────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;600;700&display=swap');
+
+.hc-ask-overlay {
+  font-family: 'Source Sans 3', 'Source Sans Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+
+/* ── Bubble width — use full available panel width ── */
+/*
+ * bubbleMaxWidth is set to 9999 in styleOptions.
+ * These rules constrain bot and user bubbles to the
+ * actual container width so they fill the panel
+ * naturally as the user resizes it.
+ */
+.hc-webchat-container .webchat__bubble,
+.hc-webchat-container .webchat__bubble--from-user {
+  max-width: calc(100% - 52px) !important;
+}
+
+.hc-webchat-container .webchat__bubble__content {
+  width: 100%;
+}
+
+
+/* ── Chip meta badge ─────────────────────────── */
+/*
+ * Styled secondary tag inside Summarize and
+ * What's new chips showing the breadcrumb-derived
+ * section name. Empty tags are invisible.
+ */
+.hc-chip-meta {
+  font-size: 10px;
+  font-weight: 600;
+  color: #5A7FAD;
+  background: rgba(0, 87, 184, 0.07);
+  border: 1px solid rgba(0, 87, 184, 0.18);
+  border-radius: 100px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: auto;
+}
+
+.hc-chip-meta:empty {
+  display: none;
+}
+
+
+/* ── Landing page typography improvements ────── */
+.hc-landing {
+  font-family: 'Source Sans 3', 'Source Sans Pro', system-ui, sans-serif;
+}
+
+.hc-land-welcome h2 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #12122A;
+}
+
+.hc-land-welcome p {
+  font-size: 13px;
+  color: #6B87A8;
+  line-height: 1.6;
+}
+
+.hc-land-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #8AACC8;
+}
+
+.hc-land-chip {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 13px;
+  line-height: 1.45;
+}
+
+.hc-land-avatar {
+  width: 48px;
+  height: 48px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+
+/* ── Landing compose input ───────────────────── */
+.hc-land-compose {
+  display: none;   /* shown via JS alongside landing */
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  background: #F5F8FF;
+  border-top: 1px solid #D0E2F8;
+  flex-shrink: 0;
+}
+
+.hc-land-textarea {
+  flex: 1;
+  background: #FFFFFF;
+  border: 1.5px solid #C2D9F8;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1A1A2E;
+  resize: none;
+  line-height: 1.5;
+  min-height: 38px;
+  max-height: 96px;
+  overflow-y: auto;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.hc-land-textarea:focus {
+  border-color: #0057B8;
+}
+
+.hc-land-textarea::placeholder {
+  color: #9BBDD8;
+}
+
+.hc-land-send-btn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: #0057B8;
+  border: none;
+  color: #FFFFFF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, transform 0.1s;
+  margin-bottom: 1px;
+}
+
+.hc-land-send-btn:hover  { opacity: 0.88; }
+.hc-land-send-btn:active { transform: scale(0.95); }
+
+@media (max-width: 640px) {
+  .hc-land-compose { padding: 10px 12px 14px; }
+}
