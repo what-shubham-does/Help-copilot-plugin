@@ -1,21 +1,20 @@
 document.addEventListener("DOMContentLoaded", function () {
 
     /* ── Settings from PHP ─────────────────────── */
-    var SETTINGS             = window.ihcSettings || {};
-    var DIRECT_LINE_SECRET   = SETTINGS.directLineSecret || "";
-    var COPILOT_SRC          = SETTINGS.copilotSrc       || "";
-    var LOGO_LETTER          = SETTINGS.logoLetter        || "H";
-    var BOT_NAME             = SETTINGS.botName           || "Icertis Help Center";
-    var ACCENT_COLOR         = SETTINGS.accentColor       || "#0057B8";
-    var USE_WEBCHAT          = !!DIRECT_LINE_SECRET;
-    var LOAD_TIMEOUT         = 12000;
-    var kbQuestions          = SETTINGS.kbQuestions       || {};
+    var SETTINGS           = window.ihcSettings || {};
+    var DIRECT_LINE_SECRET = SETTINGS.directLineSecret || "";
+    var COPILOT_SRC        = SETTINGS.copilotSrc       || "";
+    var LOGO_LETTER        = SETTINGS.logoLetter        || "H";
+    var ACCENT_COLOR       = SETTINGS.accentColor       || "#010172";
+    var USE_WEBCHAT        = !!DIRECT_LINE_SECRET;
+    var LOAD_TIMEOUT       = 12000;
+    var kbQuestions        = SETTINGS.kbQuestions       || {};
 
     /* ── Conversation persistence ──────────────────────────
-     * Three-way resumption:
-     *   1. token + conversationId  — SDK exposed the token
-     *   2. secret + conversationId — SDK did not expose token
-     *   3. secret only             — fresh conversation
+     * Three-way resumption on reconnect:
+     *   1. token + conversationId
+     *   2. secret + conversationId
+     *   3. secret only — fresh conversation
      * TTL: 25 min. Scope: sessionStorage (per tab).
      * ─────────────────────────────────────────────────────*/
     var CONV_ID_KEY     = "ihc_conv_id";
@@ -38,10 +37,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function saveConv(id, token) {
         try {
             sessionStorage.setItem(CONV_ID_KEY, id);
-            if (token &&
-                typeof token === "string" &&
-                token !== "null" &&
-                token !== "undefined") {
+            if (token && typeof token === "string" && token !== "null" && token !== "undefined") {
                 sessionStorage.setItem(CONV_TOKEN_KEY, token);
             }
             sessionStorage.setItem(CONV_EXPIRY_KEY, String(Date.now() + CONV_TTL_MS));
@@ -58,9 +54,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     /* ── Transcript persistence ────────────────────────────
-     * Captures message activities and replays on reload.
-     * Copilot Studio Direct Line does not replay history on
-     * reconnect — handled client-side at zero credit cost.
+     * Direct Line does not replay history on reconnect.
+     * Activities stored client-side and replayed into the
+     * store on resume — zero credit cost.
      * ─────────────────────────────────────────────────────*/
     function saveActivity(activity) {
         try {
@@ -108,6 +104,13 @@ document.addEventListener("DOMContentLoaded", function () {
     var landCompose   = document.getElementById("hcLandCompose");
     var landInput     = document.getElementById("hcLandInput");
     var landSend      = document.getElementById("hcLandSend");
+    var preview       = document.getElementById("hcPreview");
+    var previewTitle  = document.getElementById("hcPreviewTitle");
+    var previewMsg    = document.getElementById("hcPreviewMsg");
+    var previewPills  = document.getElementById("hcPreviewPills");
+    var previewCancel = document.getElementById("hcPreviewCancel");
+    var previewSend   = document.getElementById("hcPreviewSend");
+    var whatsnewBadge = document.getElementById("hcWhatsnewBadge");
 
     /* ── State ─────────────────────────────────── */
     var iframeLoaded       = false;
@@ -128,15 +131,24 @@ document.addEventListener("DOMContentLoaded", function () {
         if (landing)     { landing.style.display = "flex"; landingVisible = true; }
         if (landCompose) landCompose.style.display = "flex";
         if (webchatEl)   webchatEl.style.display   = "none";
+        if (overlay)     overlay.classList.add("hc-landing-active");
     }
 
     function hideLanding() {
         var landing = document.getElementById("hcLanding");
         if (landing)     { landing.style.display = "none"; landingVisible = false; }
         if (landCompose) landCompose.style.display = "none";
+        if (overlay)     overlay.classList.remove("hc-landing-active");
     }
 
-    /* Breadcrumb helpers */
+    function hidePreview() {
+        if (preview) preview.style.display = "none";
+        var landing = document.getElementById("hcLanding");
+        if (landing)     landing.style.display     = "flex";
+        if (landCompose) landCompose.style.display  = "flex";
+    }
+
+    /* ── Breadcrumb helpers ─────────────────────── */
     function getBreadcrumbItems() {
         var sel    = SETTINGS.breadcrumbSelector || ".breadcrumbs a, .breadcrumb a, [aria-label=\"Breadcrumbs\"] a, .site-breadcrumb a";
         var crumbs = Array.from(document.querySelectorAll(sel));
@@ -162,10 +174,7 @@ document.addEventListener("DOMContentLoaded", function () {
             .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
-    /* ── Per-KB question selection ─────────────────────────
-     * Returns the KB-specific question set for the current page
-     * if configured, falling back to the global q1–q4 set.
-     * ─────────────────────────────────────────────────────*/
+    /* ── Per-KB question selection ─────────────── */
     function getQuestionsForCurrentPage() {
         var ctx = window.copilotPageContext || {};
         var kb  = ctx.kb;
@@ -184,14 +193,56 @@ document.addEventListener("DOMContentLoaded", function () {
         container.innerHTML = "";
         questions.forEach(function (q) {
             var btn       = document.createElement("button");
-            btn.className = "hc-land-chip";
+            btn.className = "hc-q-row";
             btn.innerHTML =
-                "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\">" +
-                "<path d=\"M12 3C7.03 3 3 6.58 3 11c0 2.12.9 4.05 2.37 5.47L4 21l4.7-1.55C9.99 19.8 10.98 20 12 20c4.97 0 9-3.58 9-9s-4.03-8-9-8z\" stroke=\"currentColor\" stroke-width=\"1.8\"/>" +
-                "</svg><span>" + escHtml(q) + "</span>";
+                "<div class=\"hc-q-dot\"></div>" +
+                "<div class=\"hc-q-text\">" + escHtml(q) + "</div>";
             btn.addEventListener("click", function () { sendMessageAndTransition(q); });
             container.appendChild(btn);
         });
+    }
+
+    /* ── What's new preview ─────────────────────── */
+    function showWhatsnewPreview() {
+        var ctx   = window.copilotPageContext || {};
+        var items = getBreadcrumbItems();
+
+        var areaLabel = items.length > 0 ? items[0] : (ctx.kb || "the Help Center");
+        var category  = items.length > 1 ? items[1] : (ctx.category || "");
+        var pageTitle = ctx.title || "";
+
+        var message = "Tell me what latest features are released for \"" + areaLabel + "\"?";
+        if (ctx.kb)    message += "\nContext: " + ctx.kb;
+        if (category)  message += ", " + category;
+        if (pageTitle) message += ", " + pageTitle;
+
+        if (previewSend) previewSend._message = message;
+        if (previewTitle) previewTitle.textContent = "What\u2019s new in " + areaLabel + "?";
+
+        if (previewMsg) {
+            previewMsg.innerHTML =
+                "Tell me what latest features are released for <strong>" +
+                escHtml(areaLabel) + "</strong>?";
+        }
+
+        if (previewPills) {
+            previewPills.innerHTML = "";
+            var pills = [];
+            if (areaLabel) pills.push({ cls: "hc-ctx-kb",   text: areaLabel });
+            if (category)  pills.push({ cls: "hc-ctx-cat",  text: category });
+            if (pageTitle) pills.push({ cls: "hc-ctx-page", text: pageTitle });
+            pills.forEach(function (p) {
+                var span       = document.createElement("span");
+                span.className = "hc-ctx-pill " + p.cls;
+                span.textContent = p.text;
+                previewPills.appendChild(span);
+            });
+        }
+
+        var landing = document.getElementById("hcLanding");
+        if (landing)     landing.style.display     = "none";
+        if (landCompose) landCompose.style.display  = "none";
+        if (preview)     preview.style.display      = "flex";
     }
 
     function initLanding() {
@@ -214,17 +265,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
         var items = getBreadcrumbItems();
 
-        /* ── Summarize pill ─────────────────────────────────────
-         * Sends a plain message with title and human-readable
-         * section name (from breadcrumb, not the KB slug).
-         * Meta badge shows the KB section name as a styled tag.
-         * ───────────────────────────────────────────────────────*/
+        /* ── Summarize — full context matching What's new ── */
         var summarizePill = document.getElementById("hcSummarizePill");
-        var summarizeMeta = document.getElementById("hcSummarizeMeta");
         if (summarizePill) {
-            // Section label: first breadcrumb item (KB name), fallback to slug
             var sectionLabel = items.length > 0 ? items[0] : (ctx.kb || "");
-            if (summarizeMeta) summarizeMeta.textContent = sectionLabel;
+            var breadcrumb   = getBreadcrumbContext();
 
             summarizePill.onclick = function () {
                 var msg;
@@ -232,54 +277,37 @@ document.addEventListener("DOMContentLoaded", function () {
                     msg = "Summarize the release note titled: " + (ctx.title || "this page");
                 } else {
                     msg = "Summarize the Help Center article titled: " + (ctx.title || "this page");
-                    if (sectionLabel) msg += " (section: " + sectionLabel + ")";
                 }
+                if (breadcrumb) msg += "\n[Context: " + breadcrumb + "]";
+                var meta = [];
+                if (ctx.kb)       meta.push("kb: " + ctx.kb);
+                if (ctx.category) meta.push("category: " + ctx.category);
+                if (meta.length)  msg += "\n[" + meta.join(", ") + "]";
                 sendMessageAndTransition(msg);
             };
         }
 
-        /* ── What's new chip ─────────────────────────────────────
-         * Label uses most-specific breadcrumb item.
-         * Meta badge shows the breadcrumb path above the article.
-         * Message includes full context chain plus kb/category
-         * slugs for structured orchestrator routing.
-         * ─────────────────────────────────────────────────────────*/
-        var whatsnewChip  = document.getElementById("hcWhatsnewChip");
-        var whatsnewLabel = document.getElementById("hcWhatsnewLabel");
-        var whatsnewMeta  = document.getElementById("hcWhatsnewMeta");
+        /* ── What's new ── */
+        var whatsnewChip = document.getElementById("hcWhatsnewChip");
         if (whatsnewChip) {
             var showWhatsnew = SETTINGS.whatsnewEnabled && isPageAware;
             whatsnewChip.style.display = showWhatsnew ? "flex" : "none";
-
             if (showWhatsnew) {
-                if (whatsnewLabel) {
-                    var chipName = items.length ? items[items.length - 1] : (ctx.title || "this area");
-                    whatsnewLabel.textContent = "What\u2019s new in " + chipName + "?";
-                }
-                if (whatsnewMeta) {
-                    var metaPath = items.slice(0, -1);
-                    whatsnewMeta.textContent = metaPath.join(" \u203a ") || "";
-                    if (!whatsnewMeta.textContent) whatsnewMeta.style.display = "none";
-                }
+                var areaLabel = items.length > 0 ? items[0] : (ctx.kb || "");
+                if (whatsnewBadge) whatsnewBadge.textContent = areaLabel;
             }
-
-            whatsnewChip.onclick = function () {
-                var breadcrumb = getBreadcrumbContext();
-                var query      = "What are the new features in this area?\n[Context: " + breadcrumb + "]";
-                var meta       = [];
-                if (ctx.kb)       meta.push("kb: " + ctx.kb);
-                if (ctx.category) meta.push("category: " + ctx.category);
-                if (meta.length)  query += "\n[" + meta.join(", ") + "]";
-                sendMessageAndTransition(query);
-            };
+            whatsnewChip.onclick = function () { showWhatsnewPreview(); };
         }
 
         buildCommonChips();
     }
 
+    /* ── Send and transition to chat ────────────── */
     function sendMessageAndTransition(text) {
         hideLanding();
-        if (webchatEl) webchatEl.style.display = "flex";
+        if (preview)   preview.style.display   = "none";
+        if (landInput) landInput.placeholder    = "Ask a follow-up\u2026";
+        if (webchatEl) webchatEl.style.display  = "flex";
         if (storeInstance) {
             storeInstance.dispatch({
                 type:    "WEB_CHAT/SEND_MESSAGE",
@@ -310,7 +338,16 @@ document.addEventListener("DOMContentLoaded", function () {
     ════════════════════════════════════════════ */
 
     function initWebchat() {
-        if (!window.WebChat) { console.error("IHC: botframework-webchat not loaded."); showError(); return; }
+        /* Dynamic SDK load — saves ~3.5 MB on page load for non-chat visitors */
+        if (!window.WebChat) {
+            var script     = document.createElement("script");
+            script.src     = "https://cdn.botframework.com/botframework-webchat/latest/webchat.js";
+            script.onload  = function () { initWebchat(); };
+            script.onerror = function () { showError(); };
+            document.head.appendChild(script);
+            showLoading();
+            return;
+        }
 
         if (directLineInstance) {
             try { directLineInstance.end(); } catch (e) {}
@@ -319,8 +356,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
         showLoading();
 
-        var saved  = getSavedConv();
-        isResuming = !!saved;
+        var saved         = getSavedConv();
+        var savedMessages = getSavedTranscript();
+
+        /*
+         * hasHistory: true only if the user actually sent/received messages.
+         * isResuming: true if a saved conversationId exists (for connection).
+         *
+         * These are deliberately decoupled:
+         *   - isResuming controls which Direct Line connection params to use
+         *   - hasHistory controls whether to show the landing or the transcript
+         *
+         * This fixes the bug where opening the overlay without chatting saves
+         * a conversationId, causing the landing to be skipped on the next page.
+         */
+        var hasHistory = savedMessages.length > 0;
+        isResuming     = !!saved;
 
         directLineInstance = window.WebChat.createDirectLine(
             saved && saved.token
@@ -339,30 +390,28 @@ document.addEventListener("DOMContentLoaded", function () {
                         if (action.type === "DIRECT_LINE/CONNECT_FULFILLED") {
                             clearTimeout(loadTimer);
                             webchatInitialised = true;
+                            hideLoading();
 
-                            if (isResuming) {
+                            if (isResuming && hasHistory) {
+                                /* Real resume: user had messages — skip landing, show transcript */
                                 hideLanding();
                                 if (webchatEl) webchatEl.style.display = "flex";
-
-                                var transcript = getSavedTranscript();
-                                if (transcript.length) {
-                                    isReplaying = true;
-                                    setTimeout(function () {
-                                        transcript.forEach(function (act) {
-                                            store.dispatch({
-                                                type:    "DIRECT_LINE/INCOMING_ACTIVITY",
-                                                payload: { activity: act }
-                                            });
+                                isReplaying = true;
+                                setTimeout(function () {
+                                    savedMessages.forEach(function (act) {
+                                        store.dispatch({
+                                            type:    "DIRECT_LINE/INCOMING_ACTIVITY",
+                                            payload: { activity: act }
                                         });
-                                        isReplaying = false;
-                                    }, 300);
-                                }
+                                    });
+                                    isReplaying = false;
+                                }, 300);
                             } else {
+                                /* No messages yet — always show landing */
                                 showLanding();
                             }
 
                             isResuming = false;
-                            hideLoading();
 
                             if (directLineInstance && directLineInstance.conversationId) {
                                 saveConv(
@@ -370,8 +419,6 @@ document.addEventListener("DOMContentLoaded", function () {
                                     directLineInstance.token || null
                                 );
                             }
-
-                            // PAGE_CONTEXT event removed — context travels with message text.
                         }
 
                         if (action.type === "DIRECT_LINE/CONNECT_REJECTED") {
@@ -421,11 +468,9 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         );
 
-        if (!isResuming) {
-            initLanding();
-        } else {
-            if (webchatEl) webchatEl.style.display = "flex";
-        }
+        /* Build landing chips for this page; if resuming with history the
+           landing is hidden immediately, but initLanding is cheap to run. */
+        if (!hasHistory) { initLanding(); }
 
         window.WebChat.renderWebChat(
             {
@@ -436,12 +481,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     accent:                         ACCENT_COLOR,
                     backgroundColor:                "transparent",
 
-                    bubbleBackground:               "#F0F6FF",
-                    bubbleBorderColor:              "#C2D9F8",
+                    bubbleBackground:               "#ECEEFB",
+                    bubbleBorderColor:              "#D9DCF7",
                     bubbleBorderRadius:             10,
                     bubbleBorderStyle:              "solid",
                     bubbleBorderWidth:              1,
-                    bubbleTextColor:                "#1A1A2E",
+                    bubbleTextColor:                "#303030",
                     bubbleMaxWidth:                 9999,
 
                     bubbleFromUserBackground:       ACCENT_COLOR,
@@ -455,25 +500,24 @@ document.addEventListener("DOMContentLoaded", function () {
                     botAvatarInitials:              LOGO_LETTER,
                     userAvatarInitials:             "You",
                     botAvatarBackgroundColor:       ACCENT_COLOR,
-                    userAvatarBackgroundColor:      "#7A9CBF",
+                    userAvatarBackgroundColor:      "#6b6b80",
 
-                    sendBoxBackground:              "#F5F8FF",
+                    sendBoxBackground:              "#F8F8FC",
                     sendBoxButtonColor:             ACCENT_COLOR,
                     sendBoxButtonHoverColor:        ACCENT_COLOR,
                     sendBoxHeight:                  48,
-                    sendBoxTextColor:               "#1A1A2E",
-                    sendBoxPlaceholderColor:        "#7A9CBF",
+                    sendBoxTextColor:               "#303030",
+                    sendBoxPlaceholderColor:        "#8888a0",
                     hideUploadButton:               true,
 
-                    suggestedActionBackground:      "#F0F6FF",
-                    suggestedActionBorderColor:     "#C2D9F8",
+                    suggestedActionBackground:      "#ECEEFB",
+                    suggestedActionBorderColor:     "#D9DCF7",
                     suggestedActionBorderRadius:    8,
                     suggestedActionTextColor:       ACCENT_COLOR,
 
                     groupTimestamp:                 15000,
-                    timestampColor:                 "#7A9CBF",
+                    timestampColor:                 "#8888a0",
                     timestampFormat:                "relative",
-
                     markdownRespectCRLF:            true,
                 }
             },
@@ -520,8 +564,10 @@ document.addEventListener("DOMContentLoaded", function () {
         isReplaying        = false;
 
         var landing = document.getElementById("hcLanding");
-        if (landing) landing.style.display = "none";
-        if (landCompose) landCompose.style.display = "none";
+        if (landing)     landing.style.display     = "none";
+        if (landCompose) landCompose.style.display  = "none";
+        if (preview)     preview.style.display      = "none";
+        if (landInput)   landInput.placeholder       = "Ask a question\u2026";
 
         if (USE_WEBCHAT) {
             if (directLineInstance) {
@@ -538,12 +584,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function showLoading() { if (loading) loading.classList.remove("hidden"); }
     function hideLoading() { if (loading) loading.classList.add("hidden"); }
-    function showError()   {
+
+    function showError() {
         hideLoading();
         if (webchatEl) webchatEl.style.display = "none";
         if (iframe)    iframe.style.display    = "none";
         if (error)     error.classList.remove("hidden");
     }
+
     function hideError() { if (error) error.classList.add("hidden"); }
 
     /* ════════════════════════════════════════════
@@ -554,7 +602,7 @@ document.addEventListener("DOMContentLoaded", function () {
         overlay.classList.add("visible");
         backdrop.classList.add("visible");
         document.body.classList.add("hc-overlay-open");
-        document.body.style.overflow = "hidden";
+        /* Body scroll lock is CSS-only and mobile-only (see overlay.css @media) */
         updateToggleState(headerToggle, "ask");
         updateToggleState(overlayToggle, "ask");
         if (!webchatInitialised && !iframeLoaded) startLoad();
@@ -564,7 +612,6 @@ document.addEventListener("DOMContentLoaded", function () {
         overlay.classList.remove("visible");
         backdrop.classList.remove("visible");
         document.body.classList.remove("hc-overlay-open");
-        document.body.style.overflow = "";
         updateToggleState(headerToggle, "browse");
     }
 
@@ -602,20 +649,36 @@ document.addEventListener("DOMContentLoaded", function () {
         if (e.key === "Escape" && overlay && overlay.classList.contains("visible")) closeAskMode();
     });
 
-    if (retryBtn)   retryBtn.addEventListener("click", resetAndReload);
+    if (retryBtn)   retryBtn.addEventListener("click",  resetAndReload);
     if (newChatBtn) newChatBtn.addEventListener("click", resetAndReload);
 
-    /* ── Landing compose input ─────────────────────────── */
+    if (previewCancel) previewCancel.addEventListener("click", hidePreview);
+
+    if (previewSend) previewSend.addEventListener("click", function () {
+        var msg = previewSend._message || "";
+        if (!msg) return;
+        hidePreview();
+        sendMessageAndTransition(msg);
+    });
+
     if (landSend && landInput) {
         landSend.addEventListener("click", function () {
             var text = (landInput.value || "").trim();
-            if (text) { landInput.value = ""; landInput.style.height = "auto"; sendMessageAndTransition(text); }
+            if (text) {
+                landInput.value = "";
+                landInput.style.height = "auto";
+                sendMessageAndTransition(text);
+            }
         });
         landInput.addEventListener("keydown", function (e) {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 var text = (landInput.value || "").trim();
-                if (text) { landInput.value = ""; landInput.style.height = "auto"; sendMessageAndTransition(text); }
+                if (text) {
+                    landInput.value = "";
+                    landInput.style.height = "auto";
+                    sendMessageAndTransition(text);
+                }
             }
         });
         landInput.addEventListener("input", function () {
