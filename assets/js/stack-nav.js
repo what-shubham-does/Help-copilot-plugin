@@ -3,8 +3,6 @@ document.addEventListener("DOMContentLoaded", function () {
     var links = document.querySelectorAll(".stack-nav a[href]");
     links.forEach(function (link) {
         var linkPath = link.pathname.replace(/\/$/, "");
-        if (linkPath === currentPath) {
-            link.classList.add("active");
-        }
+        if (linkPath === currentPath) link.classList.add("active");
     });
 });
